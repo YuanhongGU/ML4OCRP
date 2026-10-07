@@ -1,0 +1,227 @@
+\documentclass{article}
+
+\usepackage{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{xcolor}
+\usepackage[active,tightpage]{preview}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+\newcommand{\algcmt}[1]{\hfill\textcolor{blue}{// #1}}
+\makeatletter
+\newenvironment{breakablealgorithm}
+  {%
+   \begin{center}
+   \refstepcounter{algorithm}%
+   \hrule height.8pt depth0pt \kern2pt
+   \renewcommand{\caption}[2][\relax]{%
+     {\raggedright\textbf{\ALG@name~\thealgorithm\quad}##2\par}%
+     \ifx\relax##1\relax
+       \addcontentsline{loa}{algorithm}{\protect\numberline{\thealgorithm}##2}%
+     \else
+       \addcontentsline{loa}{algorithm}{\protect\numberline{\thealgorithm}##1}%
+     \fi
+     \kern2pt\hrule\kern2pt
+   }
+   \small
+  }
+  {%
+   \kern2pt\hrule\relax
+   \end{center}
+  }
+\makeatother
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+\renewcommand{\algorithmicensure}{\textbf{Output:}}
+\PreviewEnvironment{breakablealgorithm}
+\setlength{\PreviewBorder}{8pt}
+
+\begin{document}
+
+\begin{breakablealgorithm}
+	\caption{Merge ratio and score tables \texttt{build\_id\_data\_dict}}
+	\label{alg:en:merge}
+	\begin{algorithmic}[1]
+		\REQUIRE ratio table; score table; join type \texttt{merge\_how}
+		\ENSURE \(\mathrm{id\_data\_dict}[\mathrm{id}] = (\mathrm{times},\mathrm{ratios},\mathrm{scores})\)
+		\STATE \(\mathrm{merged}\gets\) join the tables on \((\mathrm{id},\mathrm{time})\) using \texttt{merge\_how}
+		\FOR{each \((\mathrm{id},\mathrm{rows})\) in \(\mathrm{merged}\)}
+			\STATE sort \(\mathrm{rows}\) by time
+			\STATE \(\mathrm{id\_data\_dict}[\mathrm{id}]\gets(\mathrm{time},\mathrm{ratio},\mathrm{score})\)
+		\ENDFOR
+		\RETURN \(\mathrm{id\_data\_dict}\)
+	\end{algorithmic}
+\end{breakablealgorithm}
+
+\begin{breakablealgorithm}
+	\caption{Encode a ratio \texttt{RatioFeatureEncoder}}
+	\label{alg:en:encode}
+	\begin{algorithmic}[1]
+		\REQUIRE ratio \(x\) of shape \((\ldots,1)\)
+		\ENSURE embedding of size \(d_{\mathrm{model}}\); a scalar score during pretraining
+		\STATE \(h\gets\mathrm{ReLU}(\mathrm{Linear}(1\to\mathrm{hidden\_dim})(x))\)
+		\STATE \(\mathrm{embedding}\gets\mathrm{Linear}(\mathrm{hidden\_dim}\to d_{\mathrm{model}})(h)\)
+		\STATE \(\mathrm{score}\gets\mathrm{Linear}(d_{\mathrm{model}}\to 1)(\mathrm{embedding})\) \algcmt{pretraining only}
+		\RETURN \(\mathrm{embedding}\) from \texttt{get\_feature}; \((\mathrm{embedding},\mathrm{score})\) from the pretraining forward pass
+	\end{algorithmic}
+\end{breakablealgorithm}
+
+\begin{breakablealgorithm}
+	\caption{Pretrain the encoder \texttt{pretrain\_ratio\_encoder}}
+	\label{alg:en:pretrain}
+	\begin{algorithmic}[1]
+		\REQUIRE sequences of \((\mathrm{time},\mathrm{ratio},\mathrm{score})\); \(\mathrm{epochs}\), \(\mathrm{lr}\), \(\mathrm{batch\_size}\)
+		\ENSURE encoder in eval mode
+		\STATE \(\mathrm{pairs}\gets\) every \((\mathrm{ratio},\mathrm{score})\) from every sequence \algcmt{time is not an input}
+		\FOR{\(\mathrm{epoch}\gets 1\) \TO \(\mathrm{epochs}\)}
+			\FOR{each minibatch of \(\mathrm{pairs}\)}
+				\STATE \((\cdot,\mathrm{predicted\_score})\gets\mathrm{encoder}(\mathrm{ratio})\)
+				\STATE step Adam on \(\mathrm{mean\_squared\_error}(\mathrm{predicted\_score},\mathrm{score})\)
+			\ENDFOR
+		\ENDFOR
+		\STATE \(\mathrm{encoder.eval()}\)
+		\RETURN \(\mathrm{encoder}\)
+	\end{algorithmic}
+\end{breakablealgorithm}
+
+\begin{breakablealgorithm}
+	\caption{Build the Gaussian-process dataset \texttt{build\_global\_dataset}}
+	\label{alg:en:dataset}
+	\begin{algorithmic}[1]
+		\REQUIRE sequences; frozen encoder
+		\ENSURE dataset of \((x,\mathrm{score})\), with \(x\) shaped \((1+d_{\mathrm{model}})\)
+		\FOR{each \((\mathrm{time},\mathrm{ratio},\mathrm{score})\) in every sequence}
+			\STATE \(\mathrm{embedding}\gets\mathrm{encoder.get\_feature}(\mathrm{ratio})\)
+			\STATE \(x\gets\mathrm{concatenate}(\mathrm{ratio},\mathrm{embedding})\)
+			\STATE store \((x,\mathrm{score})\)
+		\ENDFOR
+		\RETURN the stacked dataset
+	\end{algorithmic}
+\end{breakablealgorithm}
+
+\begin{breakablealgorithm}
+	\caption{Fit the deep-kernel Gaussian process \texttt{train\_ocrp\_model}}
+	\label{alg:en:train}
+	\begin{algorithmic}[1]
+		\REQUIRE \(\mathrm{id\_data\_dict}\); widths; learning rate; epoch counts
+		\ENSURE checkpoint \texttt{OCRP\_model.pth}
+		\STATE pretrain the encoder, then freeze every encoder parameter
+		\STATE \(\mathrm{dataset}\gets\mathrm{build\_global\_dataset}(\mathrm{encoder})\)
+		\STATE \((\mathrm{train\_set},\mathrm{val\_set})\gets\) random split of \(\mathrm{dataset}\) by \(\mathrm{val\_ratio}\)
+		\STATE \(\mathrm{likelihood}\gets\mathrm{GaussianLikelihood}\)
+		\STATE \(\mathrm{gp}\gets\mathrm{DeepKernelGP}(\mathrm{train}_x,\mathrm{train}_y)\)
+		\STATE \hspace{1em} feature \(\gets\) ReLU MLP from \(1+d_{\mathrm{model}}\) to \(d_{\mathrm{feat}}\)
+		\STATE \hspace{1em} mean \(\gets 0\); kernel \(\gets\) scale \(\times\) RBF with one length-scale per latent dimension
+		\FOR{\(\mathrm{epoch}\gets 1\) \TO \(n_{\mathrm{epochs}}\)}
+			\STATE \(\mathrm{loss}\gets\mathrm{reduce}(-\mathrm{exact\_marginal\_log\_likelihood}(\mathrm{gp}(\mathrm{train}_x),\mathrm{train}_y))\)
+			\STATE step Adam on the GP and the likelihood
+		\ENDFOR
+		\STATE save encoder, GP, likelihood, \(\mathrm{train}_x\), \(\mathrm{train}_y\), and config
+		\RETURN the checkpoint path
+	\end{algorithmic}
+\end{breakablealgorithm}
+
+\begin{breakablealgorithm}
+	\caption{Predict the optimal ratio \texttt{predict\_optimal\_ratio}}
+	\label{alg:en:optimal}
+	\begin{algorithmic}[1]
+		\REQUIRE GP; frozen encoder; interval \([\mathrm{low},\mathrm{high}]\); \(n_{\mathrm{starts}}\); \(n_{\mathrm{steps}}\)
+		\ENSURE \((\mathrm{best\_ratio},\mathrm{best\_mean})\)
+		\STATE \(\mathrm{best\_mean}\gets-\infty\)
+		\FOR{each \(\mathrm{start}\) in \(\mathrm{linspace}(\mathrm{low},\mathrm{high},n_{\mathrm{starts}})\)}
+			\STATE \(\mathrm{ratio}\gets\mathrm{start}\)
+			\FOR{\(\mathrm{step}\gets 1\) \TO \(n_{\mathrm{steps}}\)}
+				\STATE \(x\gets\mathrm{concatenate}(\mathrm{ratio},\mathrm{encoder.get\_feature}(\mathrm{ratio}))\)
+				\STATE step Adam on \(-\mathrm{gp}(x).\mathrm{mean}\)
+				\STATE clamp \(\mathrm{ratio}\) to \([\mathrm{low},\mathrm{high}]\)
+			\ENDFOR
+			\IF{\(\mathrm{gp}(\mathrm{ratio}).\mathrm{mean}>\mathrm{best\_mean}\)}
+				\STATE keep this ratio
+			\ENDIF
+		\ENDFOR
+		\RETURN \(\mathrm{best\_ratio},\mathrm{best\_mean}\)
+	\end{algorithmic}
+\end{breakablealgorithm}
+
+\begin{breakablealgorithm}
+	\caption{Recommend the next ratio \texttt{ucb\_acquisition}}
+	\label{alg:en:ucb}
+	\begin{algorithmic}[1]
+		\REQUIRE GP; likelihood; frozen encoder; interval \([\mathrm{low},\mathrm{high}]\); \(n_{\mathrm{candidates}}\); \(\beta\)
+		\ENSURE \((\mathrm{best\_ratio},\mathrm{best\_ucb})\)
+		\STATE \(\mathrm{best\_ucb}\gets-\infty\)
+		\FOR{each \(\mathrm{ratio}\) in \(\mathrm{linspace}(\mathrm{low},\mathrm{high},n_{\mathrm{candidates}})\)}
+			\STATE \(x\gets\mathrm{concatenate}(\mathrm{ratio},\mathrm{encoder.get\_feature}(\mathrm{ratio}))\)
+			\STATE \(\mathrm{posterior}\gets\mathrm{gp}(x)\)
+			\STATE \(\mathrm{ucb}\gets\mathrm{posterior.mean}+\beta\cdot\mathrm{posterior.std}\)
+			\IF{\(\mathrm{ucb}>\mathrm{best\_ucb}\)}
+				\STATE keep this ratio
+			\ENDIF
+		\ENDFOR
+		\RETURN \(\mathrm{best\_ratio},\mathrm{best\_ucb}\)
+	\end{algorithmic}
+\end{breakablealgorithm}
+
+\begin{breakablealgorithm}
+	\caption{Fit one cell group \texttt{RatioTimePredictor.fit\_id}}
+	\label{alg:en:fit}
+	\begin{algorithmic}[1]
+		\REQUIRE \(\mathrm{id}\); \(\mathrm{times}\); \(\mathrm{ratios}\); \(\mathrm{fit\_ode}\); \(\mathrm{model\_type}\)
+		\ENSURE stored residual model, kinetic parameters, and history
+		\IF{the series has fewer than \(\mathrm{min\_points}\)}
+			\RETURN skip this \(\mathrm{id}\)
+		\ENDIF
+		\IF{\(\mathrm{fit\_ode}\)}
+			\STATE \(\mathrm{parameters}\gets\) differential evolution on the ODE mean squared error
+			\IF{that search fails}
+				\STATE \(\mathrm{parameters}\gets\) bounded local minimization, or the defaults
+			\ENDIF
+		\ELSE
+			\STATE \(\mathrm{parameters}\gets\) default kinetics
+		\ENDIF
+		\STATE \(\mathrm{ode\_ratio}\gets\) BxB1 ODE at each observed time
+		\STATE \(\mathrm{residual}\gets\mathrm{ratios}-\mathrm{ode\_ratio}\)
+		\IF{\(\mathrm{model\_type}\) is \(\mathrm{gpr}\)}
+			\STATE fit a Gaussian process from time to residual
+		\ELSE
+			\STATE fit a polynomial from time to residual
+		\ENDIF
+		\STATE store the residual model, parameters, and \((\mathrm{times},\mathrm{ratios})\)
+	\end{algorithmic}
+\end{breakablealgorithm}
+
+\begin{breakablealgorithm}
+	\caption{Query time to the target ratio \texttt{RatioTimePredictor.query}}
+	\label{alg:en:query}
+	\begin{algorithmic}[1]
+		\REQUIRE \(\mathrm{id}\); \(\mathrm{target\_ratio}\); \(\mathrm{max\_time}\)
+		\ENSURE \((\mathrm{found},\mathrm{time})\)
+		\IF{some historical \(|\mathrm{ratio}-\mathrm{target\_ratio}|\le\mathrm{tolerance}\)}
+			\RETURN the earliest such time
+		\ENDIF
+		\IF{the target is above every observed ratio and the last slope \(\le 0\)}
+			\RETURN not found
+		\ENDIF
+		\IF{the target is below every observed ratio and the last slope \(\ge 0\)}
+			\RETURN not found
+		\ENDIF
+		\STATE \(t_{\mathrm{left}}\gets\) last observed time
+		\STATE \(t_{\mathrm{right}}\gets\mathrm{max\_time}\times\mathrm{horizon\_factor}\)
+		\FOR{\(\mathrm{iteration}\gets 1\) \TO \(\mathrm{search\_iter}\)}
+			\STATE evaluate \(\mathrm{predict\_ratio}\) on a uniform grid from \(t_{\mathrm{left}}\) to \(t_{\mathrm{right}}\)
+			\IF{\(\mathrm{predicted\_ratio}-\mathrm{target\_ratio}\) never changes sign}
+				\RETURN not found
+			\ENDIF
+			\STATE shrink \([t_{\mathrm{left}},t_{\mathrm{right}}]\) to the first sign-change interval
+			\IF{the interval is narrower than \(\mathrm{time\_atol}\)}
+				\STATE \textbf{break}
+			\ENDIF
+		\ENDFOR
+		\STATE \(t\gets\) midpoint of \([t_{\mathrm{left}},t_{\mathrm{right}}]\)
+		\IF{\(|\mathrm{predict\_ratio}(t)-\mathrm{target\_ratio}|\le\mathrm{query\_tol\_factor}\times\mathrm{tolerance}\)}
+			\RETURN \((\mathrm{found},t)\)
+		\ENDIF
+		\RETURN not found
+	\end{algorithmic}
+\end{breakablealgorithm}
+
+\end{document}

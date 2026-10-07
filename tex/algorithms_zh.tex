@@ -1,0 +1,227 @@
+\documentclass{ctexart}
+
+\usepackage{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{xcolor}
+\usepackage[active,tightpage]{preview}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+\newcommand{\algcmt}[1]{\hfill\textcolor{blue}{// #1}}
+\makeatletter
+\newenvironment{breakablealgorithm}
+  {%
+   \begin{center}
+   \refstepcounter{algorithm}%
+   \hrule height.8pt depth0pt \kern2pt
+   \renewcommand{\caption}[2][\relax]{%
+     {\raggedright\textbf{\ALG@name~\thealgorithm\quad}##2\par}%
+     \ifx\relax##1\relax
+       \addcontentsline{loa}{algorithm}{\protect\numberline{\thealgorithm}##2}%
+     \else
+       \addcontentsline{loa}{algorithm}{\protect\numberline{\thealgorithm}##1}%
+     \fi
+     \kern2pt\hrule\kern2pt
+   }
+   \small
+  }
+  {%
+   \kern2pt\hrule\relax
+   \end{center}
+  }
+\makeatother
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+\renewcommand{\algorithmicensure}{\textbf{Output:}}
+\PreviewEnvironment{breakablealgorithm}
+\setlength{\PreviewBorder}{8pt}
+
+\begin{document}
+
+\begin{breakablealgorithm}
+	\caption{合并比例与分数表 \texttt{build\_id\_data\_dict}}
+	\label{alg:zh:merge}
+	\begin{algorithmic}[1]
+		\REQUIRE 比例表；分数表；连接方式 \texttt{merge\_how}
+		\ENSURE \(\mathrm{id\_data\_dict}[\mathrm{id}] = (\mathrm{times},\mathrm{ratios},\mathrm{scores})\)
+		\STATE \(\mathrm{merged}\gets\) 按 \texttt{merge\_how} 在 \((\mathrm{id},\mathrm{time})\) 上连接两张表
+		\FOR{\(\mathrm{merged}\) 中的每个 \((\mathrm{id},\mathrm{rows})\)}
+			\STATE 按 time 排序 \(\mathrm{rows}\)
+			\STATE \(\mathrm{id\_data\_dict}[\mathrm{id}]\gets(\mathrm{time},\mathrm{ratio},\mathrm{score})\)
+		\ENDFOR
+		\RETURN \(\mathrm{id\_data\_dict}\)
+	\end{algorithmic}
+\end{breakablealgorithm}
+
+\begin{breakablealgorithm}
+	\caption{编码一个比例 \texttt{RatioFeatureEncoder}}
+	\label{alg:zh:encode}
+	\begin{algorithmic}[1]
+		\REQUIRE 比例 \(x\)，形状为 \((\ldots,1)\)
+		\ENSURE 长度为 \(d_{\mathrm{model}}\) 的嵌入；预训练时还有一个标量分数
+		\STATE \(h\gets\mathrm{ReLU}(\mathrm{Linear}(1\to\mathrm{hidden\_dim})(x))\)
+		\STATE \(\mathrm{embedding}\gets\mathrm{Linear}(\mathrm{hidden\_dim}\to d_{\mathrm{model}})(h)\)
+		\STATE \(\mathrm{score}\gets\mathrm{Linear}(d_{\mathrm{model}}\to 1)(\mathrm{embedding})\) \algcmt{仅预训练}
+		\RETURN \texttt{get\_feature} 返回 \(\mathrm{embedding}\)；预训练前向返回 \((\mathrm{embedding},\mathrm{score})\)
+	\end{algorithmic}
+\end{breakablealgorithm}
+
+\begin{breakablealgorithm}
+	\caption{预训练编码器 \texttt{pretrain\_ratio\_encoder}}
+	\label{alg:zh:pretrain}
+	\begin{algorithmic}[1]
+		\REQUIRE 若干 \((\mathrm{time},\mathrm{ratio},\mathrm{score})\) 序列；\(\mathrm{epochs}\)、\(\mathrm{lr}\)、\(\mathrm{batch\_size}\)
+		\ENSURE 处于 eval 模式的编码器
+		\STATE \(\mathrm{pairs}\gets\) 所有序列中的 \((\mathrm{ratio},\mathrm{score})\) \algcmt{时间不是输入}
+		\FOR{\(\mathrm{epoch}\gets 1\) \TO \(\mathrm{epochs}\)}
+			\FOR{\(\mathrm{pairs}\) 的每个小批量}
+				\STATE \((\cdot,\mathrm{predicted\_score})\gets\mathrm{encoder}(\mathrm{ratio})\)
+				\STATE 用均方误差对 Adam 更新
+			\ENDFOR
+		\ENDFOR
+		\STATE \(\mathrm{encoder.eval()}\)
+		\RETURN \(\mathrm{encoder}\)
+	\end{algorithmic}
+\end{breakablealgorithm}
+
+\begin{breakablealgorithm}
+	\caption{建立高斯过程数据集 \texttt{build\_global\_dataset}}
+	\label{alg:zh:dataset}
+	\begin{algorithmic}[1]
+		\REQUIRE 序列；已冻结的编码器
+		\ENSURE \((x,\mathrm{score})\) 数据集，\(x\) 的形状为 \((1+d_{\mathrm{model}})\)
+		\FOR{每个序列中的 \((\mathrm{time},\mathrm{ratio},\mathrm{score})\)}
+			\STATE \(\mathrm{embedding}\gets\mathrm{encoder.get\_feature}(\mathrm{ratio})\)
+			\STATE \(x\gets\) 拼接\((\mathrm{ratio},\mathrm{embedding})\)
+			\STATE 保存 \((x,\mathrm{score})\)
+		\ENDFOR
+		\RETURN 堆叠后的数据集
+	\end{algorithmic}
+\end{breakablealgorithm}
+
+\begin{breakablealgorithm}
+	\caption{拟合深度核高斯过程 \texttt{train\_ocrp\_model}}
+	\label{alg:zh:train}
+	\begin{algorithmic}[1]
+		\REQUIRE \(\mathrm{id\_data\_dict}\)；各层宽度；学习率；轮数
+		\ENSURE 检查点 \texttt{OCRP\_model.pth}
+		\STATE 预训练编码器，然后冻结其全部参数
+		\STATE \(\mathrm{dataset}\gets\mathrm{build\_global\_dataset}(\mathrm{encoder})\)
+		\STATE \((\mathrm{train\_set},\mathrm{val\_set})\gets\) 按 \(\mathrm{val\_ratio}\) 随机划分 \(\mathrm{dataset}\)
+		\STATE \(\mathrm{likelihood}\gets\mathrm{GaussianLikelihood}\)
+		\STATE \(\mathrm{gp}\gets\mathrm{DeepKernelGP}(\mathrm{train}_x,\mathrm{train}_y)\)
+		\STATE \hspace{1em} feature \(\gets\) 从 \(1+d_{\mathrm{model}}\) 到 \(d_{\mathrm{feat}}\) 的 ReLU 多层感知机
+		\STATE \hspace{1em} mean \(\gets 0\)；kernel \(\gets\) 缩放 \(\times\) 每个潜在维度一个长度尺度的 RBF
+		\FOR{\(\mathrm{epoch}\gets 1\) \TO \(n_{\mathrm{epochs}}\)}
+			\STATE \(\mathrm{loss}\gets\) 归约\((-\mathrm{exact\_marginal\_log\_likelihood}(\mathrm{gp}(\mathrm{train}_x),\mathrm{train}_y))\)
+			\STATE 用 Adam 更新高斯过程和似然
+		\ENDFOR
+		\STATE 保存 encoder、gp、likelihood、\(\mathrm{train}_x\)、\(\mathrm{train}_y\) 和 config
+		\RETURN 检查点路径
+	\end{algorithmic}
+\end{breakablealgorithm}
+
+\begin{breakablealgorithm}
+	\caption{预测最优比例 \texttt{predict\_optimal\_ratio}}
+	\label{alg:zh:optimal}
+	\begin{algorithmic}[1]
+		\REQUIRE 高斯过程；已冻结的编码器；区间 \([\mathrm{low},\mathrm{high}]\)；\(n_{\mathrm{starts}}\)；\(n_{\mathrm{steps}}\)
+		\ENSURE \((\mathrm{best\_ratio},\mathrm{best\_mean})\)
+		\STATE \(\mathrm{best\_mean}\gets-\infty\)
+		\FOR{\(\mathrm{linspace}(\mathrm{low},\mathrm{high},n_{\mathrm{starts}})\) 中的每个 \(\mathrm{start}\)}
+			\STATE \(\mathrm{ratio}\gets\mathrm{start}\)
+			\FOR{\(\mathrm{step}\gets 1\) \TO \(n_{\mathrm{steps}}\)}
+				\STATE \(x\gets\) 拼接\((\mathrm{ratio},\mathrm{encoder.get\_feature}(\mathrm{ratio}))\)
+				\STATE 用 \(-\mathrm{gp}(x).\mathrm{mean}\) 更新 Adam
+				\STATE 把 \(\mathrm{ratio}\) 限制在 \([\mathrm{low},\mathrm{high}]\)
+			\ENDFOR
+			\IF{\(\mathrm{gp}(\mathrm{ratio}).\mathrm{mean}>\mathrm{best\_mean}\)}
+				\STATE 保留这个 \(\mathrm{ratio}\)
+			\ENDIF
+		\ENDFOR
+		\RETURN \(\mathrm{best\_ratio},\mathrm{best\_mean}\)
+	\end{algorithmic}
+\end{breakablealgorithm}
+
+\begin{breakablealgorithm}
+	\caption{推荐下一个比例 \texttt{ucb\_acquisition}}
+	\label{alg:zh:ucb}
+	\begin{algorithmic}[1]
+		\REQUIRE 高斯过程；似然；已冻结的编码器；区间 \([\mathrm{low},\mathrm{high}]\)；\(n_{\mathrm{candidates}}\)；\(\beta\)
+		\ENSURE \((\mathrm{best\_ratio},\mathrm{best\_ucb})\)
+		\STATE \(\mathrm{best\_ucb}\gets-\infty\)
+		\FOR{\(\mathrm{linspace}(\mathrm{low},\mathrm{high},n_{\mathrm{candidates}})\) 中的每个 \(\mathrm{ratio}\)}
+			\STATE \(x\gets\) 拼接\((\mathrm{ratio},\mathrm{encoder.get\_feature}(\mathrm{ratio}))\)
+			\STATE \(\mathrm{posterior}\gets\mathrm{gp}(x)\)
+			\STATE \(\mathrm{ucb}\gets\mathrm{posterior.mean}+\beta\cdot\mathrm{posterior.std}\)
+			\IF{\(\mathrm{ucb}>\mathrm{best\_ucb}\)}
+				\STATE 保留这个 \(\mathrm{ratio}\)
+			\ENDIF
+		\ENDFOR
+		\RETURN \(\mathrm{best\_ratio},\mathrm{best\_ucb}\)
+	\end{algorithmic}
+\end{breakablealgorithm}
+
+\begin{breakablealgorithm}
+	\caption{拟合一个细胞群 \texttt{RatioTimePredictor.fit\_id}}
+	\label{alg:zh:fit}
+	\begin{algorithmic}[1]
+		\REQUIRE \(\mathrm{id}\)；\(\mathrm{times}\)；\(\mathrm{ratios}\)；\(\mathrm{fit\_ode}\)；\(\mathrm{model\_type}\)
+		\ENSURE 保存的残差模型、动力学参数和历史
+		\IF{序列短于 \(\mathrm{min\_points}\)}
+			\RETURN 跳过该 \(\mathrm{id}\)
+		\ENDIF
+		\IF{\(\mathrm{fit\_ode}\)}
+			\STATE \(\mathrm{parameters}\gets\) 对常微分方程均方误差做差分进化
+			\IF{该搜索失败}
+				\STATE \(\mathrm{parameters}\gets\) 有界局部最小化，或默认参数
+			\ENDIF
+		\ELSE
+			\STATE \(\mathrm{parameters}\gets\) 默认动力学参数
+		\ENDIF
+		\STATE \(\mathrm{ode\_ratio}\gets\) 在每个观测时间上的 BxB1 常微分方程
+		\STATE \(\mathrm{residual}\gets\mathrm{ratios}-\mathrm{ode\_ratio}\)
+		\IF{\(\mathrm{model\_type}\) 为 \(\mathrm{gpr}\)}
+			\STATE 拟合从时间到残差的高斯过程
+		\ELSE
+			\STATE 拟合从时间到残差的多项式
+		\ENDIF
+		\STATE 保存残差模型、参数和 \((\mathrm{times},\mathrm{ratios})\)
+	\end{algorithmic}
+\end{breakablealgorithm}
+
+\begin{breakablealgorithm}
+	\caption{查询达到目标比例的时间 \texttt{RatioTimePredictor.query}}
+	\label{alg:zh:query}
+	\begin{algorithmic}[1]
+		\REQUIRE \(\mathrm{id}\)；\(\mathrm{target\_ratio}\)；\(\mathrm{max\_time}\)
+		\ENSURE \((\mathrm{found},\mathrm{time})\)
+		\IF{某条历史记录满足 \(|\mathrm{ratio}-\mathrm{target\_ratio}|\le\mathrm{tolerance}\)}
+			\RETURN 其中最早的时间
+		\ENDIF
+		\IF{目标高于全部观测比例，且最后一段斜率 \(\le 0\)}
+			\RETURN 未找到
+		\ENDIF
+		\IF{目标低于全部观测比例，且最后一段斜率 \(\ge 0\)}
+			\RETURN 未找到
+		\ENDIF
+		\STATE \(t_{\mathrm{left}}\gets\) 最后一次观测时间
+		\STATE \(t_{\mathrm{right}}\gets\mathrm{max\_time}\times\mathrm{horizon\_factor}\)
+		\FOR{\(\mathrm{iteration}\gets 1\) \TO \(\mathrm{search\_iter}\)}
+			\STATE 在 \(t_{\mathrm{left}}\) 到 \(t_{\mathrm{right}}\) 的均匀网格上计算 \(\mathrm{predict\_ratio}\)
+			\IF{\(\mathrm{predicted\_ratio}-\mathrm{target\_ratio}\) 没有变号}
+				\RETURN 未找到
+			\ENDIF
+			\STATE 把 \([t_{\mathrm{left}},t_{\mathrm{right}}]\) 缩到第一个变号区间
+			\IF{区间窄于 \(\mathrm{time\_atol}\)}
+				\STATE \textbf{break}
+			\ENDIF
+		\ENDFOR
+		\STATE \(t\gets[t_{\mathrm{left}},t_{\mathrm{right}}]\) 的中点
+		\IF{\(|\mathrm{predict\_ratio}(t)-\mathrm{target\_ratio}|\le\mathrm{query\_tol\_factor}\times\mathrm{tolerance}\)}
+			\RETURN \((\mathrm{found},t)\)
+		\ENDIF
+		\RETURN 未找到
+	\end{algorithmic}
+\end{breakablealgorithm}
+
+\end{document}
