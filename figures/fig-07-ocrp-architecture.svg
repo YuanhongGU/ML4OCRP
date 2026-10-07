@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 620" width="980" height="620" role="img" aria-label="OCRP architecture: ratio encoder, deep-kernel Gaussian process, and two readouts">
+  <rect width="980" height="620" fill="#ffffff"/>
+  <text x="16" y="28" fill="#1c1c1c" font-family="Segoe UI, system-ui, sans-serif" font-size="18" font-weight="650">OCRP model architecture</text>
+  <text x="16" y="48" fill="#52525b" font-family="Segoe UI, system-ui, sans-serif" font-size="12">Frozen ratio encoder, deep-kernel Gaussian process, and two readouts of the score posterior.</text>
+  <g transform="translate(0, 56)" font-family="Segoe UI, system-ui, sans-serif">
+    <defs>
+      <marker id="ocrp-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+        <path d="M0,0 L8,4 L0,8 Z" fill="#71717a"/>
+      </marker>
+    </defs>
+
+    <text x="16" y="22" fill="#3f3f46" font-size="12" font-weight="650">RatioFeatureEncoder</text>
+    <text x="720" y="22" fill="#71717a" font-size="11">dashed: pretraining only</text>
+
+    <g>
+      <rect x="16" y="40" width="100" height="54" rx="6" fill="#f7f7f8" stroke="#d4d4d8"/>
+      <text x="66" y="62" text-anchor="middle" fill="#1c1c1c" font-size="12" font-weight="650">ratio</text>
+      <text x="66" y="79" text-anchor="middle" fill="#52525b" font-size="11">R^1</text>
+    </g>
+    <g>
+      <rect x="148" y="40" width="118" height="54" rx="6" fill="#f7f7f8" stroke="#d4d4d8"/>
+      <text x="207" y="62" text-anchor="middle" fill="#1c1c1c" font-size="12" font-weight="650">Linear</text>
+      <text x="207" y="79" text-anchor="middle" fill="#52525b" font-size="11">1 to 32</text>
+    </g>
+    <g>
+      <rect x="298" y="40" width="72" height="54" rx="6" fill="#f7f7f8" stroke="#d4d4d8"/>
+      <text x="334" y="71" text-anchor="middle" fill="#1c1c1c" font-size="12" font-weight="650">ReLU</text>
+    </g>
+    <g>
+      <rect x="402" y="40" width="118" height="54" rx="6" fill="#f7f7f8" stroke="#d4d4d8"/>
+      <text x="461" y="62" text-anchor="middle" fill="#1c1c1c" font-size="12" font-weight="650">Linear</text>
+      <text x="461" y="79" text-anchor="middle" fill="#52525b" font-size="11">32 to 16</text>
+    </g>
+    <g>
+      <rect x="552" y="40" width="128" height="54" rx="6" fill="#f7f7f8" stroke="#d4d4d8"/>
+      <text x="616" y="62" text-anchor="middle" fill="#1c1c1c" font-size="12" font-weight="650">embedding</text>
+      <text x="616" y="79" text-anchor="middle" fill="#52525b" font-size="11">d_model = 16</text>
+    </g>
+    <g>
+      <rect x="740" y="40" width="220" height="54" rx="6" fill="#fafafa" stroke="#71717a" stroke-dasharray="4 3"/>
+      <text x="850" y="62" text-anchor="middle" fill="#1c1c1c" font-size="12" font-weight="650">score head</text>
+      <text x="850" y="79" text-anchor="middle" fill="#52525b" font-size="11">Linear 16 to 1 | MSE</text>
+    </g>
+
+    <line x1="116" y1="67" x2="148" y2="67" stroke="#71717a" stroke-width="1.25" marker-end="url(#ocrp-arrow)"/>
+    <line x1="266" y1="67" x2="298" y2="67" stroke="#71717a" stroke-width="1.25" marker-end="url(#ocrp-arrow)"/>
+    <line x1="370" y1="67" x2="402" y2="67" stroke="#71717a" stroke-width="1.25" marker-end="url(#ocrp-arrow)"/>
+    <line x1="520" y1="67" x2="552" y2="67" stroke="#71717a" stroke-width="1.25" marker-end="url(#ocrp-arrow)"/>
+    <line x1="680" y1="67" x2="740" y2="67" stroke="#71717a" stroke-width="1.25" stroke-dasharray="4 3" marker-end="url(#ocrp-arrow)"/>
+
+    <text x="16" y="132" fill="#3f3f46" font-size="12" font-weight="650">GP input</text>
+    <text x="16" y="150" fill="#71717a" font-size="11">Raw ratio is kept. The encoder is frozen, so only get_feature is used.</text>
+
+    <g>
+      <rect x="300" y="168" width="320" height="54" rx="6" fill="#eef3f9" stroke="#1d4e89" stroke-width="1.5"/>
+      <text x="460" y="190" text-anchor="middle" fill="#1c1c1c" font-size="12" font-weight="650">concat(ratio, embedding)</text>
+      <text x="460" y="207" text-anchor="middle" fill="#52525b" font-size="11">(N, 1 + 16) = (N, 17)</text>
+    </g>
+    <path d="M 66 94 C 66 140, 360 140, 360 168" fill="none" stroke="#71717a" stroke-width="1.25" marker-end="url(#ocrp-arrow)"/>
+    <path d="M 616 94 C 616 140, 560 140, 560 168" fill="none" stroke="#71717a" stroke-width="1.25" marker-end="url(#ocrp-arrow)"/>
+
+    <text x="16" y="262" fill="#3f3f46" font-size="12" font-weight="650">DeepKernelGP</text>
+    <text x="140" y="262" fill="#71717a" font-size="11">Exact GP. Kernel is evaluated in the learned 8-dimensional space.</text>
+
+    <g>
+      <rect x="16" y="280" width="124" height="54" rx="6" fill="#f7f7f8" stroke="#d4d4d8"/>
+      <text x="78" y="302" text-anchor="middle" fill="#1c1c1c" font-size="12" font-weight="650">Linear</text>
+      <text x="78" y="319" text-anchor="middle" fill="#52525b" font-size="11">17 to 32</text>
+    </g>
+    <g>
+      <rect x="164" y="280" width="72" height="54" rx="6" fill="#f7f7f8" stroke="#d4d4d8"/>
+      <text x="200" y="311" text-anchor="middle" fill="#1c1c1c" font-size="12" font-weight="650">ReLU</text>
+    </g>
+    <g>
+      <rect x="260" y="280" width="124" height="54" rx="6" fill="#f7f7f8" stroke="#d4d4d8"/>
+      <text x="322" y="302" text-anchor="middle" fill="#1c1c1c" font-size="12" font-weight="650">Linear</text>
+      <text x="322" y="319" text-anchor="middle" fill="#52525b" font-size="11">32 to 8</text>
+    </g>
+    <g>
+      <rect x="408" y="280" width="88" height="54" rx="6" fill="#f7f7f8" stroke="#d4d4d8"/>
+      <text x="452" y="302" text-anchor="middle" fill="#1c1c1c" font-size="12" font-weight="650">latent z</text>
+      <text x="452" y="319" text-anchor="middle" fill="#52525b" font-size="11">R^8</text>
+    </g>
+    <g>
+      <rect x="528" y="268" width="176" height="78" rx="6" fill="#f7f7f8" stroke="#d4d4d8"/>
+      <text x="616" y="302" text-anchor="middle" fill="#1c1c1c" font-size="12" font-weight="650">kernel on z</text>
+      <text x="616" y="319" text-anchor="middle" fill="#52525b" font-size="11">ZeroMean | Scale | RBF-ARD</text>
+    </g>
+    <g>
+      <rect x="728" y="276" width="112" height="62" rx="6" fill="#f7f7f8" stroke="#d4d4d8"/>
+      <text x="784" y="302" text-anchor="middle" fill="#1c1c1c" font-size="12" font-weight="650">ExactGP</text>
+      <text x="784" y="319" text-anchor="middle" fill="#52525b" font-size="11">Gaussian noise</text>
+    </g>
+    <g>
+      <rect x="864" y="276" width="100" height="62" rx="6" fill="#eef3f9" stroke="#1d4e89" stroke-width="1.5"/>
+      <text x="914" y="302" text-anchor="middle" fill="#1c1c1c" font-size="12" font-weight="650">p(score)</text>
+      <text x="914" y="319" text-anchor="middle" fill="#52525b" font-size="11">N(mu, sigma^2)</text>
+    </g>
+
+    <line x1="140" y1="307" x2="164" y2="307" stroke="#71717a" stroke-width="1.25" marker-end="url(#ocrp-arrow)"/>
+    <line x1="236" y1="307" x2="260" y2="307" stroke="#71717a" stroke-width="1.25" marker-end="url(#ocrp-arrow)"/>
+    <line x1="384" y1="307" x2="408" y2="307" stroke="#71717a" stroke-width="1.25" marker-end="url(#ocrp-arrow)"/>
+    <line x1="496" y1="307" x2="528" y2="307" stroke="#71717a" stroke-width="1.25" marker-end="url(#ocrp-arrow)"/>
+    <line x1="704" y1="307" x2="728" y2="307" stroke="#71717a" stroke-width="1.25" marker-end="url(#ocrp-arrow)"/>
+    <line x1="840" y1="307" x2="864" y2="307" stroke="#71717a" stroke-width="1.25" marker-end="url(#ocrp-arrow)"/>
+
+    <text x="16" y="392" fill="#3f3f46" font-size="12" font-weight="650">Readout</text>
+    <text x="88" y="392" fill="#71717a" font-size="11">The ratio is the only free variable. GP parameters stay fixed.</text>
+
+    <g>
+      <rect x="520" y="416" width="210" height="64" rx="6" fill="#f7f7f8" stroke="#d4d4d8"/>
+      <text x="625" y="442" text-anchor="middle" fill="#1c1c1c" font-size="12" font-weight="650">global optimum</text>
+      <text x="625" y="459" text-anchor="middle" fill="#52525b" font-size="11">maximize mu on [0.01, 5]</text>
+    </g>
+    <g>
+      <rect x="754" y="416" width="210" height="64" rx="6" fill="#f7f7f8" stroke="#d4d4d8"/>
+      <text x="859" y="442" text-anchor="middle" fill="#1c1c1c" font-size="12" font-weight="650">UCB next ratio</text>
+      <text x="859" y="459" text-anchor="middle" fill="#52525b" font-size="11">maximize mu + beta * sigma</text>
+    </g>
+    <path d="M 914 338 C 914 380, 625 380, 625 416" fill="none" stroke="#71717a" stroke-width="1.25" marker-end="url(#ocrp-arrow)"/>
+    <path d="M 914 338 C 914 380, 859 380, 859 416" fill="none" stroke="#71717a" stroke-width="1.25" marker-end="url(#ocrp-arrow)"/>
+
+    <text x="16" y="520" fill="#71717a" font-size="11">Encoder: MSE on observed scores, then frozen. GP: exact marginal log-likelihood.</text>
+    <text x="16" y="540" fill="#71717a" font-size="11">Source: Model/ocrp_model.py | defaults hidden_dim = 32, d_model = 16, feat_dim = 8</text>
+  </g>
+</svg>

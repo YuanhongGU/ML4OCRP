@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 980" width="980" height="980" role="img" aria-label="ML4OCRP full workflow from synthetic data through preprocessing, training, recommendation, time query, and in silico check">
+  <rect width="980" height="980" fill="#ffffff"/>
+  <text x="20" y="32" fill="#1c1c1c" font-family="Segoe UI, system-ui, sans-serif" font-size="18" font-weight="600">ML4OCRP full workflow</text>
+  <text x="20" y="52" fill="#52525b" font-family="Segoe UI, system-ui, sans-serif" font-size="12">Synthetic observations, preprocessing, OCRP training, sampling guidance, per-ID time query, and an in silico check.</text>
+
+  <defs>
+    <marker id="flow-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#71717a"/>
+    </marker>
+  </defs>
+
+  <g font-family="Segoe UI, system-ui, sans-serif">
+    <text x="20" y="84" fill="#3f3f46" font-size="12" font-weight="600">1. Synthetic observations</text>
+    <text x="210" y="84" fill="#71717a" font-size="11">InSilicoValidation</text>
+
+    <g>
+      <rect x="20" y="96" width="560" height="80" rx="6" fill="#f7f7f8" stroke="#d4d4d8"/>
+      <text x="36" y="126" fill="#1c1c1c" font-size="13" font-weight="600">1  fitting_ratio.py</text>
+      <text x="36" y="148" fill="#52525b" font-size="12">Simulate the BxB1 recombination ODE for each cell-group ID.</text>
+    </g>
+    <line x1="580" y1="136" x2="612" y2="136" stroke="#71717a" stroke-width="1.25" marker-end="url(#flow-arrow)"/>
+    <g>
+      <rect x="612" y="96" width="348" height="80" rx="6" fill="#eef3f9" stroke="#1d4e89" stroke-width="1.5"/>
+      <text x="628" y="126" fill="#1c1c1c" font-size="12" font-weight="600">ratio_data.csv</text>
+      <text x="628" y="146" fill="#52525b" font-size="12">param_data.csv</text>
+      <text x="628" y="164" fill="#71717a" font-size="11">Data/Original</text>
+    </g>
+
+    <line x1="300" y1="176" x2="300" y2="204" stroke="#71717a" stroke-width="1.25" marker-end="url(#flow-arrow)"/>
+
+    <g>
+      <rect x="20" y="204" width="560" height="80" rx="6" fill="#f7f7f8" stroke="#d4d4d8"/>
+      <text x="36" y="234" fill="#1c1c1c" font-size="13" font-weight="600">2  fitting_score.py</text>
+      <text x="36" y="256" fill="#52525b" font-size="12">Turn each ratio into a score with a Gaussian peaked at the target ratio.</text>
+    </g>
+    <line x1="580" y1="244" x2="612" y2="244" stroke="#71717a" stroke-width="1.25" marker-end="url(#flow-arrow)"/>
+    <g>
+      <rect x="612" y="204" width="348" height="80" rx="6" fill="#eef3f9" stroke="#1d4e89" stroke-width="1.5"/>
+      <text x="628" y="238" fill="#1c1c1c" font-size="12" font-weight="600">score_data.csv</text>
+      <text x="628" y="258" fill="#71717a" font-size="11">Data/Original | reads ratio_data.csv</text>
+    </g>
+
+    <line x1="300" y1="284" x2="300" y2="332" stroke="#71717a" stroke-width="1.25" marker-end="url(#flow-arrow)"/>
+
+    <text x="20" y="324" fill="#3f3f46" font-size="12" font-weight="600">2. ML4OCRP software</text>
+    <text x="190" y="324" fill="#71717a" font-size="11">Model/</text>
+
+    <g>
+      <rect x="20" y="336" width="560" height="80" rx="6" fill="#f7f7f8" stroke="#d4d4d8"/>
+      <text x="36" y="366" fill="#1c1c1c" font-size="13" font-weight="600">3  preprocess_data.py</text>
+      <text x="36" y="388" fill="#52525b" font-size="12">Inner-join ratio and score on (id, time), then sort each ID.</text>
+    </g>
+    <line x1="580" y1="376" x2="612" y2="376" stroke="#71717a" stroke-width="1.25" marker-end="url(#flow-arrow)"/>
+    <g>
+      <rect x="612" y="336" width="348" height="80" rx="6" fill="#eef3f9" stroke="#1d4e89" stroke-width="1.5"/>
+      <text x="628" y="366" fill="#1c1c1c" font-size="12" font-weight="600">id_data_dict.npy</text>
+      <text x="628" y="386" fill="#52525b" font-size="12">id to (times, ratios, scores)</text>
+      <text x="628" y="404" fill="#71717a" font-size="11">Data/Preprocessed</text>
+    </g>
+
+    <line x1="300" y1="416" x2="300" y2="444" stroke="#71717a" stroke-width="1.25" marker-end="url(#flow-arrow)"/>
+
+    <g>
+      <rect x="20" y="444" width="560" height="80" rx="6" fill="#f7f7f8" stroke="#d4d4d8"/>
+      <text x="36" y="474" fill="#1c1c1c" font-size="13" font-weight="600">4  ocrp_model_train.py</text>
+      <text x="36" y="496" fill="#52525b" font-size="12">Pretrain the ratio encoder, freeze it, then fit the deep-kernel GP.</text>
+    </g>
+    <line x1="580" y1="484" x2="612" y2="484" stroke="#71717a" stroke-width="1.25" marker-end="url(#flow-arrow)"/>
+    <g>
+      <rect x="612" y="444" width="348" height="80" rx="6" fill="#eef3f9" stroke="#1d4e89" stroke-width="1.5"/>
+      <text x="628" y="478" fill="#1c1c1c" font-size="12" font-weight="600">OCRP_model.pth</text>
+      <text x="628" y="498" fill="#71717a" font-size="11">Data/Model | reads id_data_dict.npy</text>
+    </g>
+
+    <line x1="300" y1="524" x2="300" y2="552" stroke="#71717a" stroke-width="1.25" marker-end="url(#flow-arrow)"/>
+
+    <g>
+      <rect x="20" y="552" width="560" height="80" rx="6" fill="#f7f7f8" stroke="#d4d4d8"/>
+      <text x="36" y="582" fill="#1c1c1c" font-size="13" font-weight="600">5  predict_ratio_and_recommend_by_ucb.py</text>
+      <text x="36" y="604" fill="#52525b" font-size="12">Maximize the GP mean, and choose the next ratio with UCB.</text>
+    </g>
+    <line x1="580" y1="592" x2="612" y2="592" stroke="#71717a" stroke-width="1.25" marker-end="url(#flow-arrow)"/>
+    <g>
+      <rect x="612" y="552" width="348" height="80" rx="6" fill="#eef3f9" stroke="#1d4e89" stroke-width="1.5"/>
+      <text x="628" y="578" fill="#1c1c1c" font-size="12" font-weight="600">predict_result.csv</text>
+      <text x="628" y="598" fill="#52525b" font-size="12">GLOBAL_OPTIMAL_RATIO, UCB_RECOMMEND</text>
+      <text x="628" y="616" fill="#71717a" font-size="11">Data/Predict | reads OCRP_model.pth</text>
+    </g>
+
+    <line x1="300" y1="632" x2="300" y2="660" stroke="#71717a" stroke-width="1.25" marker-end="url(#flow-arrow)"/>
+
+    <g>
+      <rect x="20" y="660" width="560" height="80" rx="6" fill="#f7f7f8" stroke="#d4d4d8"/>
+      <text x="36" y="690" fill="#1c1c1c" font-size="13" font-weight="600">6  query_per_id.py --fit_ode</text>
+      <text x="36" y="712" fill="#52525b" font-size="12">Per ID, fit ODE plus residual GP and find the time of the optimal ratio.</text>
+    </g>
+    <line x1="580" y1="700" x2="612" y2="700" stroke="#71717a" stroke-width="1.25" marker-end="url(#flow-arrow)"/>
+    <g>
+      <rect x="612" y="660" width="348" height="80" rx="6" fill="#eef3f9" stroke="#1d4e89" stroke-width="1.5"/>
+      <text x="628" y="686" fill="#1c1c1c" font-size="12" font-weight="600">predict_id_time_dict.npy</text>
+      <text x="628" y="706" fill="#52525b" font-size="12">time, status -1 / 1 / 0</text>
+      <text x="628" y="724" fill="#71717a" font-size="11">Data/Predict | also reads id_data_dict.npy</text>
+    </g>
+
+    <line x1="300" y1="740" x2="300" y2="788" stroke="#71717a" stroke-width="1.25" marker-end="url(#flow-arrow)"/>
+
+    <text x="20" y="780" fill="#3f3f46" font-size="12" font-weight="600">3. In silico check</text>
+    <text x="160" y="780" fill="#71717a" font-size="11">InSilicoValidation</text>
+
+    <g>
+      <rect x="20" y="792" width="560" height="80" rx="6" fill="#f7f7f8" stroke="#d4d4d8"/>
+      <text x="36" y="822" fill="#1c1c1c" font-size="13" font-weight="600">7  get_actual_ratio.py</text>
+      <text x="36" y="844" fill="#52525b" font-size="12">Integrate the true ODE at each predicted (id, time).</text>
+    </g>
+    <line x1="580" y1="832" x2="612" y2="832" stroke="#71717a" stroke-width="1.25" marker-end="url(#flow-arrow)"/>
+    <g>
+      <rect x="612" y="792" width="348" height="80" rx="6" fill="#eef3f9" stroke="#1d4e89" stroke-width="1.5"/>
+      <text x="628" y="818" fill="#1c1c1c" font-size="12" font-weight="600">actual_ratios_at_predicted_times.csv</text>
+      <text x="628" y="838" fill="#52525b" font-size="12">reads param_data.csv</text>
+      <text x="628" y="856" fill="#71717a" font-size="11">Data/Predict</text>
+    </g>
+
+    <text x="20" y="908" fill="#71717a" font-size="11">Status codes from query_per_id.py: -1 already seen in history, 1 predicted in the future, 0 not reached.</text>
+    <text x="20" y="928" fill="#71717a" font-size="11">Gray boxes are scripts. Blue boxes are the files they write. Order matches Val.sh.</text>
+    <text x="20" y="956" fill="#71717a" font-size="11">The OCRP network itself (encoder and deep-kernel GP) is drawn in figures/fig-07-ocrp-architecture.svg.</text>
+  </g>
+</svg>
