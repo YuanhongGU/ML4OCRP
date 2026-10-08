@@ -1,0 +1,4 @@
+.idea/ 
+.streamlit/
+Model/__pycache__
+InSilicoValidation/__pycache__/
